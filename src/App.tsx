@@ -1,35 +1,8 @@
 import { useEffect, useState, useRef } from "react";
 // import reactLogo from "./assets/react.svg";
 // import "./App.css";
-import "@tensorflow/tfjs-backend-webgl";
-import * as mobilenet from "@tensorflow-models/mobilenet";
-
-function retrieveImageFromClipboardAsBlob(pasteEvent: any, callback: Function) {
-  if (pasteEvent.clipboardData == false) {
-    if (typeof callback == "function") {
-      callback(undefined);
-    }
-  }
-
-  var items = pasteEvent.clipboardData.items;
-
-  if (items == undefined) {
-    if (typeof callback == "function") {
-      callback(undefined);
-    }
-  }
-
-  for (var i = 0; i < items.length; i++) {
-    // Skip content if not image
-    if (items[i].type.indexOf("image") == -1) continue;
-    // Retrieve image on clipboard as blob
-    var blob = items[i].getAsFile();
-
-    if (typeof callback == "function") {
-      callback(blob);
-    }
-  }
-}
+import { useClipboardImageUrl } from "./useClipboardImageUrl";
+import { useModel } from "./useModel";
 
 // const pasteHandler = function (event: any) {
 
@@ -47,56 +20,27 @@ function retrieveImageFromClipboardAsBlob(pasteEvent: any, callback: Function) {
 //   );
 // };
 
-function createUrlFromBlob(imageBlob: any) {
-  var URLObj = window.URL || window.webkitURL;
-
-  // Creates a DOMString containing a URL representing the object given in the parameter
-  // namely the original Blob
-  return URLObj.createObjectURL(imageBlob);
-}
-
 function App() {
-  const [isModelLoading, setIsModelLoading] = useState(false);
-  const [model, setModel] = useState<mobilenet.MobileNet | null>(null);
   const [imageUrl, setImageUrl] = useState<string | null>(null);
 
   const [history, setHistory] = useState<string[]>([]);
 
-  const [results, setResults] = useState<Awaited<
-    ReturnType<mobilenet.MobileNet["classify"]>
+  const [results, setResults] = useState<Array<
+    Awaited<ReturnType<ReturnType<typeof useModel>["classify"]>>
   > | null>(null);
 
   const textInputRef = useRef<React.LegacyRef<HTMLInputElement>>(null);
   const fileInputRef = useRef<React.LegacyRef<HTMLInputElement>>(null);
   const imageRef = useRef<React.LegacyRef<HTMLImageElement>>(null);
-  const loadModel = async () => {
-    console.log("Loading");
-    try {
-      setIsModelLoading(true);
-      const model = await mobilenet.load();
-      console.log("loaded");
-      setModel(model);
-    } catch (error) {
-      console.log("error");
-      console.log(error);
-    } finally {
-      setIsModelLoading(false);
-    }
-  };
+
+  const { isModelLoading, classify, isModelLoaded } = useModel();
+
+  const { clipboardImageUrl } = useClipboardImageUrl();
 
   useEffect(() => {
-    let handler = function (e: any) {
-      // Handle the event
-      retrieveImageFromClipboardAsBlob(e, function (imageBlob) {
-        const url = createUrlFromBlob(imageBlob);
-        setImageUrl(url);
-      });
-    };
-    window.addEventListener("paste", handler, false);
-    return () => {
-      window.removeEventListener("paste", handler);
-    };
-  }, [setImageUrl]);
+    setImageUrl(clipboardImageUrl);
+  }, [clipboardImageUrl, setImageUrl]);
+
   const uploadImage: React.ChangeEventHandler<HTMLInputElement> = (event) => {
     const files = event.target.files;
     if ((files?.length || 0) > 0) {
@@ -110,10 +54,6 @@ function App() {
     setImageUrl(null);
     return;
   };
-
-  useEffect(() => {
-    loadModel();
-  }, []);
 
   useEffect(() => {
     if (imageUrl != null) {
@@ -143,7 +83,7 @@ function App() {
     console.log("identifying1");
     if (imageRef.current != null) {
       console.log("identifying2");
-      const results = await model?.classify(imageRef.current as any);
+      const results = await classify(imageRef.current as any);
       console.log(results);
       setResults(results);
     }
@@ -235,21 +175,3 @@ function App() {
 }
 
 export default App;
-
-//   return (
-//     <div className="App">
-//       <header className="App-header">
-//         <img src={require("./assets/react.svg")} className="App-logo" alt="logo" />
-//         <p>
-//           Edit <code>src/App.tsx</code> and save to reload.
-
-//   };
-
-//   return (
-//     <div className="App">
-//       <h1>Image Identification</h1>
-//     </div>
-//   );
-// }
-
-// export default App;
